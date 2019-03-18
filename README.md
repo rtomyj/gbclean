@@ -1,3 +1,3 @@
 # gbclean
 
-Tool for cleaning git branches
+Tool for cleaning git branches.
