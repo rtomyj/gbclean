@@ -1,18 +1,11 @@
 #!/usr/bin/bash
+
+source ~/.colorize.sh
+
 function clean_date()
 {
 	clean=$(echo "$1" | sed "s/ ago//g")
 	echo "$clean"
-}
-
-function yellow_output()
-{
-	printf "\033[1;33m"
-}
-
-function normal_output()
-{
-	printf "\033[0m"
 }
 
 function git_command_exec()
@@ -21,7 +14,7 @@ function git_command_exec()
 		repoPath=${REPO_maps_PATH[$key]}
 		cd $repoPath
 		yellow_output
-		echo "Updating $key repo"
+		echo -e "Updating $key repo\n"
 
 		normal_output
 
@@ -77,9 +70,9 @@ function get_stale_branches()
 	fi
 
 	if [[ $IGNORE_FILE != "" ]]; then
-		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master' | fgrep -vw 'release' | fgrep -vw -f "$IGNORE_FILE")
+		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master' | fgrep -vw -f "$IGNORE_FILE")
 	else
-		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master' | fgrep -vw 'release')
+		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master')
 	fi
 	
 	cleanBranches=$(printf "$branchesInRange" | cut -f2 | cut -d'/' -f3| uniq )
@@ -125,10 +118,6 @@ function get_stale_branches()
 			fi
 		fi
 	done 3<<< "$cleanBranches"
-	
-	if [ $confirmDELETE = true ]; then
-		git push
-	fi
 }
 
 declare -g DELETE=false
@@ -136,28 +125,39 @@ declare -g GIT_PULL=false
 declare -g VERBOSE=false
 declare -g CUSTOM_GIT_REPO=false
 declare -g IGNORE_FILE=''
+declare -g INTERACTIVE=false
 
-while getopts "dhpvdc:i:" opt
+while getopts "hpvdic:f:" opt
 	do
 		case $opt in
 			(h)
-				echo "help menu"
+				echo "-d (d)eletes stale branches if checking for stale branches"
+				echo "-i (i)nteractive, confirmation when needed"
+				echo "-v (v)erbose output"
+				echo "-p (p)rints config file"
+				echo "-f (f)ile containing branches to ignore if checking for stale branches"
 				exit 0
 				;;
 			(d)
 				DELETE=true
 				;;
+			(i)
+				INTERACTIVE=true
+				;;
 			(v)
 				VERBOSE=true
 				;;
 			(p)
+				yellow_output
+				echo "$(pwd ~)/.git_repos"
+				normal_output
 				cat ~/.git_repos
 				exit 0
 				;;
 			(c)
 				CUSTOM_GIT_REPO=true
 				;;
-			(i)
+			(f)
 				IGNORE_FILE=$(realpath "$OPTARG")
 				;;
 		esac
