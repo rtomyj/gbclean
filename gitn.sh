@@ -4,7 +4,7 @@ source ~/.colorize.sh
 
 function clean_date()
 {
-	clean=$(echo "$1" | sed "s/ ago//g")
+	clean=$(echo ${1// ago/})
 	echo "$clean"
 }
 
@@ -19,15 +19,18 @@ function git_command_exec()
 		normal_output
 
 		if [ "$2" = "" ]; then
-			echo "$1 >>> MASTER"
-			git checkout master &> /dev/null
-			git "$1"
-
-			echo ""
-
-			echo "$1 >>> RELEASE"
-			git checkout release &> /dev/null
-			git "$1"
+			for importantBranch in $(echo $IMPORTANT_BRANCHES | tr + " "); do
+				yellow_output
+				echo -n "$1"
+				normal_output
+				echo -n " on "
+				yellow_output
+				echo "$importantBranch"
+				normal_output
+				
+				git checkout "$importantBranch" &> /dev/null
+				git "$1"
+			done
 		else
 			echo "$1 >>> $2"
 			git checkout "$2" &> /dev/null
@@ -88,7 +91,7 @@ function get_stale_branches()
 
 	numBranches=$(echo -e "$branchesInRange" | egrep -v ^$ | wc -l)
 	if [ $numBranches -eq 0 ]; then
-		echo "No branches found matching older than $cleanDate and processed through ignore filter"
+		echo -e "\nNo branches found matching older than $cleanDate and processed through ignore filter"
 		exit 0
 	else
 		if [ $VERBOSE = true ]; then
@@ -173,7 +176,7 @@ while getopts "hpvdic:f:" opt
 	done
 
 
-arg1=$(echo "${@:$OPTIND:2}" | cut -d' ' -f1)
+arg1=$(echo "${@:$OPTIND:1}")
 
 declare -Ag REPO_maps_PATH
 while IFS= read -r line; do
@@ -196,9 +199,11 @@ fi
 # Finding stale branches on all repos
 ago=$arg1
 cutoffDate=$(date +%F --date="$ago")
-yellow_output
-echo -e "Using $cutoffDate as the cutoff date. \n"
+echo -n "Using"
+red_output
+echo -n " $cutoffDate "
 normal_output
+echo -e "as the cutoff date. \n"
 
 for repo in ${!REPO_maps_PATH[@]}; do
 	path=${REPO_maps_PATH[$repo]}
