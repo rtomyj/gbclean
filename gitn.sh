@@ -77,12 +77,12 @@ function get_stale_branches()
 	fi
 
 	if [[ $IGNORE_FILE != "" ]]; then
-		branchesInRange=$(printf "$branchesInRange" | fgrep -v 'master' | fgrep -v 'release' | fgrep -v -f "$IGNORE_FILE")
-		cleanBranches=$(printf "$branchesInRange" | cut -f2 | cut -d'/' -f3 )
+		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master' | fgrep -vw 'release' | fgrep -vw -f "$IGNORE_FILE")
 	else
-		branchesInRange=$(printf "$branchesInRange" | fgrep -v 'master' | fgrep -v 'release')
-		cleanBranches=$(printf "$branchesInRange" | cut -f2 | cut -d'/' -f3 )
+		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master' | fgrep -vw 'release')
 	fi
+	
+	cleanBranches=$(printf "$branchesInRange" | cut -f2 | cut -d'/' -f3| uniq )
 
 
 	numBranches=$(echo -e "$branchesInRange" | egrep -v ^$ | wc -l)
@@ -117,10 +117,17 @@ function get_stale_branches()
 		fi
 	fi
 
+	while read -r cleanBranch <&3; do
+		if [ $confirmDELETE = true ]; then
+			read -p "Delete $cleanBranch?: " r
+			if [ "$r" = 'y' ]; then
+				git push origin --delete "$cleanBranch"
+			fi
+		fi
+	done 3<<< "$cleanBranches"
+	
 	if [ $confirmDELETE = true ]; then
-		while read -r cleanBranch; do
-			echo "$cleanBranch -"
-		done <<< "$cleanBranches"
+		git push
 	fi
 }
 
@@ -151,13 +158,15 @@ while getopts "dhpvdc:i:" opt
 				CUSTOM_GIT_REPO=true
 				;;
 			(i)
-				IGNORE_FILE=$(realpath.exe "$OPTARG")
+				IGNORE_FILE=$(realpath "$OPTARG")
 				;;
 		esac
 	done
 
 
 arg1=$(echo "${@:$OPTIND:2}" | cut -d' ' -f1)
+
+#echo $IGNORE_FILE; exit 0;
 
 declare -Ag REPO_maps_PATH
 while IFS= read -r line; do
@@ -178,9 +187,8 @@ for repo in ${!REPO_maps_PATH[@]}; do
 	ago=${@:$OPTIND:1}
 	cutoffDate=$(date +%F --date="$ago")
 	yellow_output
-	echo "Using $cutoffDate as the cutoff date."
+	echo -e "Using $cutoffDate as the cutoff date. \n"
 	normal_output
-	echo ""
 
 	path=${REPO_maps_PATH[$repo]}
 	get_stale_branches "$ago" "$repo" "$path"
