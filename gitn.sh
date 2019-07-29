@@ -42,11 +42,14 @@ function get_stale_branches()
 {
 	repo=$2
 	path=$3
+	
 	cd "$path"
 
+	echo -n "Switching to"
 	yellow_output
-	echo "Swtiching to $repo -> $path"
+	echo -n " $repo "
 	normal_output
+	echo "@ $path"
 
 	ago=$1
 	cutoffEpoch=$(date +%s --date="$ago")
@@ -75,6 +78,11 @@ function get_stale_branches()
 		branchesInRange=$(printf "$branchesInRange" | fgrep -vw 'master')
 	fi
 	
+	# ignores branches user has specified in config file
+	for importantBranch in $(echo $IMPORTANT_BRANCHES | tr "+" " "); do
+		branchesInRange=$(printf "$branchesInRange" | fgrep -vw "$importantBranch" )
+	done
+	
 	cleanBranches=$(printf "$branchesInRange" | cut -f2 | cut -d'/' -f3| uniq )
 
 
@@ -91,7 +99,7 @@ function get_stale_branches()
 	fi
 
 	yellow_output
-	echo -e "\nBRANCHES"
+	echo -e "\nStale branches\n-----"
 	normal_output
 	echo "$cleanBranches"
 
@@ -126,6 +134,7 @@ declare -g VERBOSE=false
 declare -g CUSTOM_GIT_REPO=false
 declare -g IGNORE_FILE=''
 declare -g INTERACTIVE=false
+declare -g IMPORTANT_BRANCHES=''
 
 while getopts "hpvdic:f:" opt
 	do
@@ -166,30 +175,32 @@ while getopts "hpvdic:f:" opt
 
 arg1=$(echo "${@:$OPTIND:2}" | cut -d' ' -f1)
 
-#echo $IGNORE_FILE; exit 0;
-
 declare -Ag REPO_maps_PATH
 while IFS= read -r line; do
 	repo=$(echo $line | cut -d"=" -f1)
-	path=$(echo $line | cut -d"=" -f2)
+	path=$(echo $line | cut -d"=" -f2 | cut -d":" -f1)
 	REPO_maps_PATH[$repo]=$path
+	
+	IMPORTANT_BRANCHES=$(echo $line | cut -d"=" -f2 | cut -d":" -f2)
 done < ~/.git_repos
 
-# Calling pull on all repos
+
+# Executes a git command on all saved repos found in .git_repos
 if [ "$arg1" = "pull" -o "$arg1" = "status" -o "$arg1" = "checkout" ]; then
 	arg2=$(echo "${@:$OPTIND:2}" | cut -d' ' -f2 -s)
 	git_command_exec "$arg1" "$arg2"
 	exit 0
 fi
 
-# Finding stale branches on all repos
-for repo in ${!REPO_maps_PATH[@]}; do
-	ago=${@:$OPTIND:1}
-	cutoffDate=$(date +%F --date="$ago")
-	yellow_output
-	echo -e "Using $cutoffDate as the cutoff date. \n"
-	normal_output
 
+# Finding stale branches on all repos
+ago=$arg1
+cutoffDate=$(date +%F --date="$ago")
+yellow_output
+echo -e "Using $cutoffDate as the cutoff date. \n"
+normal_output
+
+for repo in ${!REPO_maps_PATH[@]}; do
 	path=${REPO_maps_PATH[$repo]}
 	get_stale_branches "$ago" "$repo" "$path"
 done
